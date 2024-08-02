@@ -51,3 +51,10 @@ MIT License
 - Backup your databases and critical data before running the script. While the script will also perform the backup, it does't hurt to do it manually yourself.
 - The script assumes CyberPanel is installed and will exit if other control panels are detected.
 
+
+## Additional Information 
+For more detailed information about upgrading MariaDB, please refer to the official MariaDB documentation:
+
+- **MariaDB Upgrade Documentation**: [MariaDB Upgrade Documentation](https://mariadb.com/docs/server/service-management/upgrades/community-server/release-series-cs10-6/)
+
+
