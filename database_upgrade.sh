@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# ==========================================================================
+# Script Name:     database_upgrade.sh
+# Description:     This script automates the process of upgrading MariaDB on Cyberpanel server.
+# Author:          Dan Kibera
+# Email:           info@lintsawa.com
+# License:         MIT License (or other license type)
+# Version:         1.0
+# Date:            2nd Aug, 2024.
+# ==========================================================================
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
