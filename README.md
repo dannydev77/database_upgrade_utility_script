@@ -38,7 +38,7 @@ Enter optin 'N' and it will proceed.
 
 ## License
 
-Specify the license under which this script is distributed. For example, MIT License.
+MIT License
 
 ## Contact
 
