@@ -5,7 +5,7 @@
 # Description:     This script automates the process of upgrading MariaDB on Cyberpanel server.
 # Author:          Dan Kibera
 # Email:           info@lintsawa.com
-# License:         MIT License (or other license type)
+# License:         MIT License
 # Version:         1.0
 # Date:            2nd Aug, 2024.
 # ==========================================================================
