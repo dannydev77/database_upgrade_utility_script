@@ -17,10 +17,10 @@ command_exists() {
 
 # Check for root privileges
 echo "=========================================================="
-echo "Checking for root privilege ......................."
+echo "Checking for root privilege ............."
 echo "=========================================================="
 if [[ $EUID -ne 0 ]]; then
-   echo "=========================================================="
+   
    echo "This script must be run as root. Exiting..."
    echo "=========================================================="
    exit 1
@@ -114,21 +114,38 @@ else
     exit 1
 fi
 
-# Check for sufficient disk space
+# Check if any databases exist
 echo "=========================================================="
-echo "Checking for sufficient disk space..."
+echo "Checking for existing databases..."
 echo "=========================================================="
-REQUIRED_SPACE_GB=5  # Estimate required space in GB
-AVAILABLE_SPACE_GB=$(df / | awk 'NR==2 {print $4 / 1024 / 1024}')
-if (( $(echo "$AVAILABLE_SPACE_GB >= $REQUIRED_SPACE_GB" | bc -l) )); then
+DB_COUNT=$(mariadb -N -e 'SHOW DATABASES;' | wc -l)
+if [[ "$DB_COUNT" -eq 0 ]]; then
     echo "=========================================================="
-    echo "Sufficient disk space available: $AVAILABLE_SPACE_GB GB"
-    echo "=========================================================="
-else
-    echo "=========================================================="
-    echo "Insufficient disk space: $AVAILABLE_SPACE_GB GB available, $REQUIRED_SPACE_GB GB required. Exiting..."
+    echo "No databases found. Exiting..."
     echo "=========================================================="
     exit 1
+else
+    echo "=========================================================="
+    echo "Found $DB_COUNT databases. Proceeding with upgrade."
+    echo "=========================================================="
+fi
+
+# Check for deprecated features
+echo "=========================================================="
+echo "Checking for deprecated features in MariaDB configuration..."
+echo "=========================================================="
+DEPRECATED_FEATURES=$(mariadb --print-defaults | grep -i "deprecated")
+if [[ -n "$DEPRECATED_FEATURES" ]]; then
+    echo "=========================================================="
+    echo "Deprecated features detected:"
+    echo "$DEPRECATED_FEATURES"
+    echo "Please review and remove deprecated features before proceeding."
+    echo "=========================================================="
+    exit 1
+else
+    echo "=========================================================="
+    echo "No deprecated features found."
+    echo "=========================================================="
 fi
 
 # Backup all databases
@@ -137,12 +154,12 @@ echo "=========================================================="
 echo "Backing up all databases to $BACKUP_DIR"
 echo "=========================================================="
 mkdir -p "$BACKUP_DIR"
-mysql -N -e 'show databases' | while read dbname; do
-  echo "Backing up $dbname..."
+mariadb -N -e 'show databases' | while read dbname; do
+  echo "Backup in progres $dbname......"
   mysqldump --complete-insert --routines --triggers --single-transaction "$dbname" > "$BACKUP_DIR/$dbname.sql"
 done
 echo "=========================================================="
-echo "Backup completed."
+echo "Backup job completed."
 echo "=========================================================="
 
 # Retrieve MariaDB root password
@@ -201,7 +218,7 @@ fi
 
 # Install the new MariaDB version
 echo "=========================================================="
-echo "Installing MariaDB 10.6..."
+echo "Installing MariaDB 10.6....."
 echo "=========================================================="
 curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | sudo bash -s -- --mariadb-server-version="mariadb-10.6"
 apt update
