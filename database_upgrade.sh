@@ -2,7 +2,7 @@
 
 # ==========================================================================
 # Script Name:     database_upgrade.sh
-# Description:     This script automates the process of upgrading MariaDB on Cyberpanel server.
+# Description:     This script automates the process of upgrading MariaDB on CyberPanel server.
 # Author:          Dan Kibera
 # Email:           info@lintsawa.com
 # License:         MIT License
@@ -19,11 +19,11 @@ command_exists() {
 echo "=========================================================="
 echo "Checking for root privilege ............."
 echo "=========================================================="
-if [[ $EUID -ne 0 ]]; then
-   
-   echo "This script must be run as root. Exiting..."
-   echo "=========================================================="
-   exit 1
+if [ "$EUID" -ne 0 ]; then
+    echo "=========================================================="
+    echo "This script must be run as root. Exiting..."
+    echo "=========================================================="
+    exit 1
 fi
 echo "=========================================================="
 echo "You are running as root....Proceeding...."
@@ -34,7 +34,7 @@ echo "=========================================================="
 echo "Checking OS version..."
 echo "=========================================================="
 . /etc/os-release
-if [[ "$NAME" == "Ubuntu" && "${VERSION_ID//.}" -ge 2004 ]]; then
+if [ "$NAME" = "Ubuntu" ] && [ "${VERSION_ID//.}" -ge 2004 ]; then
     echo "=========================================================="
     echo "OS is $NAME $VERSION_ID, compatible for upgrade."
     echo "=========================================================="
@@ -51,7 +51,7 @@ echo "Checking for installed control panels..."
 echo "=========================================================="
 
 # Detect CyberPanel
-if [[ -f /usr/local/CyberCP/CyberCP/settings.py ]]; then
+if [ -f /usr/local/CyberCP/CyberCP/settings.py ]; then
     echo "CyberPanel detected."
 else
     echo "=========================================================="
@@ -64,19 +64,19 @@ fi
 PANEL_DETECTED=false
 
 # Check for cPanel
-if [[ -d /usr/local/cpanel ]]; then
+if [ -d /usr/local/cpanel ]; then
     echo "cPanel detected."
     PANEL_DETECTED=true
 fi
 
 # Check for Plesk
-if [[ -d /usr/local/psa ]]; then
+if [ -d /usr/local/psa ]; then
     echo "Plesk detected."
     PANEL_DETECTED=true
 fi
 
 # Check for CloudPanel
-if [[ -d /opt/cloudpanel ]]; then
+if [ -d /opt/cloudpanel ]; then
     echo "CloudPanel detected."
     PANEL_DETECTED=true
 fi
@@ -102,7 +102,7 @@ echo "Current MariaDB version: $CURRENT_VERSION"
 echo "=========================================================="
 echo "Checking if upgrade from $CURRENT_VERSION to 10.6 is supported..."
 echo "=========================================================="
-if [[ "$CURRENT_VERSION" =~ ^10\.3 ]]; then
+if [ "$(echo "$CURRENT_VERSION" | grep -o '^10\.3')" ]; then
     echo "=========================================================="
     echo "Upgrade path from $CURRENT_VERSION to 10.6 is supported."
     echo "=========================================================="
@@ -119,7 +119,7 @@ echo "=========================================================="
 echo "Checking for existing databases..."
 echo "=========================================================="
 DB_COUNT=$(mariadb -N -e 'SHOW DATABASES;' | wc -l)
-if [[ "$DB_COUNT" -eq 0 ]]; then
+if [ "$DB_COUNT" -eq 0 ]; then
     echo "=========================================================="
     echo "No databases found. Exiting..."
     echo "=========================================================="
@@ -135,7 +135,7 @@ echo "=========================================================="
 echo "Checking for deprecated features in MariaDB configuration..."
 echo "=========================================================="
 DEPRECATED_FEATURES=$(mariadb --print-defaults | grep -i "deprecated")
-if [[ -n "$DEPRECATED_FEATURES" ]]; then
+if [ -n "$DEPRECATED_FEATURES" ]; then
     echo "=========================================================="
     echo "Deprecated features detected:"
     echo "$DEPRECATED_FEATURES"
@@ -154,8 +154,8 @@ echo "=========================================================="
 echo "Backing up all databases to $BACKUP_DIR"
 echo "=========================================================="
 mkdir -p "$BACKUP_DIR"
-mariadb -N -e 'show databases' | while read dbname; do
-  echo "Backup in progres $dbname......"
+mariadb -N -e 'show databases' | while read -r dbname; do
+  echo "Backup in progress $dbname......"
   mysqldump --complete-insert --routines --triggers --single-transaction "$dbname" > "$BACKUP_DIR/$dbname.sql"
 done
 echo "=========================================================="
@@ -167,7 +167,7 @@ echo "=========================================================="
 echo "Retrieving MariaDB root password..."
 echo "=========================================================="
 MYSQL_ROOT_PASSWORD=$(cat /etc/cyberpanel/mysqlPassword)
-if [[ -z "$MYSQL_ROOT_PASSWORD" ]]; then
+if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
     echo "=========================================================="
     echo "MariaDB root password not found. Exiting..."
     echo "=========================================================="
