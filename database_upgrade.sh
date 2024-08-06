@@ -10,6 +10,8 @@
 # Date:            2nd Aug, 2024.
 # ==========================================================================
 
+
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -17,13 +19,13 @@ command_exists() {
 
 # Check for root privileges
 echo "=========================================================="
-echo "Checking for root privilege ............."
+echo "Checking for root privilege .................................................................................."
 echo "=========================================================="
-if [ "$EUID" -ne 0 ]; then
-    echo "=========================================================="
-    echo "This script must be run as root. Exiting..."
-    echo "=========================================================="
-    exit 1
+if [[ $EUID -ne 0 ]]; then
+   echo "=========================================================="
+   echo "This script must be run as root. Exiting..."
+   echo "=========================================================="
+   exit 1
 fi
 echo "=========================================================="
 echo "You are running as root....Proceeding...."
@@ -34,7 +36,7 @@ echo "=========================================================="
 echo "Checking OS version..."
 echo "=========================================================="
 . /etc/os-release
-if [ "$NAME" = "Ubuntu" ] && [ "${VERSION_ID//.}" -ge 2004 ]; then
+if [[ "$NAME" == "Ubuntu" && "${VERSION_ID//.}" -ge 2004 ]]; then
     echo "=========================================================="
     echo "OS is $NAME $VERSION_ID, compatible for upgrade."
     echo "=========================================================="
@@ -51,7 +53,7 @@ echo "Checking for installed control panels..."
 echo "=========================================================="
 
 # Detect CyberPanel
-if [ -f /usr/local/CyberCP/CyberCP/settings.py ]; then
+if [[ -f /usr/local/CyberCP/CyberCP/settings.py ]]; then
     echo "CyberPanel detected."
 else
     echo "=========================================================="
@@ -64,19 +66,19 @@ fi
 PANEL_DETECTED=false
 
 # Check for cPanel
-if [ -d /usr/local/cpanel ]; then
+if [[ -d /usr/local/cpanel ]]; then
     echo "cPanel detected."
     PANEL_DETECTED=true
 fi
 
 # Check for Plesk
-if [ -d /usr/local/psa ]; then
+if [[ -d /usr/local/psa ]]; then
     echo "Plesk detected."
     PANEL_DETECTED=true
 fi
 
 # Check for CloudPanel
-if [ -d /opt/cloudpanel ]; then
+if [[ -d /opt/cloudpanel ]]; then
     echo "CloudPanel detected."
     PANEL_DETECTED=true
 fi
@@ -102,7 +104,7 @@ echo "Current MariaDB version: $CURRENT_VERSION"
 echo "=========================================================="
 echo "Checking if upgrade from $CURRENT_VERSION to 10.6 is supported..."
 echo "=========================================================="
-if [ "$(echo "$CURRENT_VERSION" | grep -o '^10\.3')" ]; then
+if [[ "$CURRENT_VERSION" =~ ^10\.3 ]]; then
     echo "=========================================================="
     echo "Upgrade path from $CURRENT_VERSION to 10.6 is supported."
     echo "=========================================================="
@@ -114,38 +116,21 @@ else
     exit 1
 fi
 
-# Check if any databases exist
+# Check for sufficient disk space
 echo "=========================================================="
-echo "Checking for existing databases..."
+echo "Checking for sufficient disk space..."
 echo "=========================================================="
-DB_COUNT=$(mariadb -N -e 'SHOW DATABASES;' | wc -l)
-if [ "$DB_COUNT" -eq 0 ]; then
+REQUIRED_SPACE_GB=5  # Estimate required space in GB
+AVAILABLE_SPACE_GB=$(df / | awk 'NR==2 {print $4 / 1024 / 1024}')
+if (( $(echo "$AVAILABLE_SPACE_GB >= $REQUIRED_SPACE_GB" | bc -l) )); then
     echo "=========================================================="
-    echo "No databases found. Exiting..."
+    echo "Sufficient disk space available: $AVAILABLE_SPACE_GB GB"
     echo "=========================================================="
-    exit 1
 else
     echo "=========================================================="
-    echo "Found $DB_COUNT databases. Proceeding with upgrade."
-    echo "=========================================================="
-fi
-
-# Check for deprecated features
-echo "=========================================================="
-echo "Checking for deprecated features in MariaDB configuration..."
-echo "=========================================================="
-DEPRECATED_FEATURES=$(mariadb --print-defaults | grep -i "deprecated")
-if [ -n "$DEPRECATED_FEATURES" ]; then
-    echo "=========================================================="
-    echo "Deprecated features detected:"
-    echo "$DEPRECATED_FEATURES"
-    echo "Please review and remove deprecated features before proceeding."
+    echo "Insufficient disk space: $AVAILABLE_SPACE_GB GB available, $REQUIRED_SPACE_GB GB required. Exiting..."
     echo "=========================================================="
     exit 1
-else
-    echo "=========================================================="
-    echo "No deprecated features found."
-    echo "=========================================================="
 fi
 
 # Backup all databases
@@ -154,12 +139,12 @@ echo "=========================================================="
 echo "Backing up all databases to $BACKUP_DIR"
 echo "=========================================================="
 mkdir -p "$BACKUP_DIR"
-mariadb -N -e 'show databases' | while read -r dbname; do
-  echo "Backup in progress $dbname......"
+mysql -N -e 'show databases' | while read dbname; do
+  echo "Backing up $dbname..."
   mysqldump --complete-insert --routines --triggers --single-transaction "$dbname" > "$BACKUP_DIR/$dbname.sql"
 done
 echo "=========================================================="
-echo "Backup job completed."
+echo "Backup completed."
 echo "=========================================================="
 
 # Retrieve MariaDB root password
@@ -167,7 +152,7 @@ echo "=========================================================="
 echo "Retrieving MariaDB root password..."
 echo "=========================================================="
 MYSQL_ROOT_PASSWORD=$(cat /etc/cyberpanel/mysqlPassword)
-if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
+if [[ -z "$MYSQL_ROOT_PASSWORD" ]]; then
     echo "=========================================================="
     echo "MariaDB root password not found. Exiting..."
     echo "=========================================================="
@@ -218,7 +203,7 @@ fi
 
 # Install the new MariaDB version
 echo "=========================================================="
-echo "Installing MariaDB 10.6....."
+echo "Installing MariaDB 10.6..."
 echo "=========================================================="
 curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | sudo bash -s -- --mariadb-server-version="mariadb-10.6"
 apt update
