@@ -10,26 +10,21 @@
 # Date:            3rd Aug, 2024.
 # ==========================================================================
 
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to handle errors
-handle_error() {
-    echo "=========================================================="
-    echo "Error: $1"
-    echo "Exiting..."
-    echo "=========================================================="
-    exit 1
-}
-
 # Check for root privileges
 echo "=========================================================="
-echo "Checking for root privilege ............."
+echo "Checking for root privilege .................................................................................."
 echo "=========================================================="
-if [ "$EUID" -ne 0 ]; then
-    handle_error "This script must be run as root."
+if [[ $EUID -ne 0 ]]; then
+   echo "=========================================================="
+   echo "This script must be run as root. Exiting..."
+   echo "=========================================================="
+   exit 1
 fi
 echo "=========================================================="
 echo "You are running as root....Proceeding...."
@@ -40,12 +35,15 @@ echo "=========================================================="
 echo "Checking OS version..."
 echo "=========================================================="
 . /etc/os-release
-if [ "$NAME" = "Ubuntu" ] && [ "${VERSION_ID//.}" -ge 2004 ]; then
+if [[ "$NAME" == "Ubuntu" && "${VERSION_ID//.}" -ge 2004 ]]; then
     echo "=========================================================="
     echo "OS is $NAME $VERSION_ID, compatible for upgrade."
     echo "=========================================================="
 else
-    handle_error "This script is compatible only with Ubuntu 20.04 or higher."
+    echo "=========================================================="
+    echo "This script is compatible only with Ubuntu 20.04 or higher. Exiting..."
+    echo "=========================================================="
+    exit 1
 fi
 
 # Check for control panels
@@ -54,29 +52,32 @@ echo "Checking for installed control panels..."
 echo "=========================================================="
 
 # Detect CyberPanel
-if [ -f /usr/local/CyberCP/CyberCP/settings.py ]; then
+if [[ -f /usr/local/CyberCP/CyberCP/settings.py ]]; then
     echo "CyberPanel detected."
 else
-    handle_error "CyberPanel not detected. This script can only be run on servers with CyberPanel."
+    echo "=========================================================="
+    echo "CyberPanel not detected. This script can only be run on servers with CyberPanel."
+    echo "=========================================================="
+    exit 1
 fi
 
 # Detect other common control panels
 PANEL_DETECTED=false
 
 # Check for cPanel
-if [ -d /usr/local/cpanel ]; then
+if [[ -d /usr/local/cpanel ]]; then
     echo "cPanel detected."
     PANEL_DETECTED=true
 fi
 
 # Check for Plesk
-if [ -d /usr/local/psa ]; then
+if [[ -d /usr/local/psa ]]; then
     echo "Plesk detected."
     PANEL_DETECTED=true
 fi
 
 # Check for CloudPanel
-if [ -d /opt/cloudpanel ]; then
+if [[ -d /opt/cloudpanel ]]; then
     echo "CloudPanel detected."
     PANEL_DETECTED=true
 fi
@@ -85,7 +86,10 @@ fi
 # Add checks for any additional control panels as needed
 
 if [ "$PANEL_DETECTED" = true ]; then
-    handle_error "Another control panel detected. This script is only supported on CyberPanel."
+    echo "=========================================================="
+    echo "Another control panel detected. This script is only supported on CyberPanel. Exiting..."
+    echo "=========================================================="
+    exit 1
 fi
 
 # Confirm current MariaDB version
@@ -93,50 +97,39 @@ echo "=========================================================="
 echo "Confirming current MariaDB version..."
 echo "=========================================================="
 CURRENT_VERSION=$(mariadb --version | grep -oP '\d+\.\d+\.\d+')
-if [ -z "$CURRENT_VERSION" ]; then
-    handle_error "Unable to determine the current MariaDB version."
-fi
 echo "Current MariaDB version: $CURRENT_VERSION"
 
 # Check if upgrade from 10.3 to 10.6 is supported
 echo "=========================================================="
 echo "Checking if upgrade from $CURRENT_VERSION to 10.6 is supported..."
 echo "=========================================================="
-if [ "$(echo "$CURRENT_VERSION" | grep -o '^10\.3')" ]; then
+if [[ "$CURRENT_VERSION" =~ ^10\.3 ]]; then
     echo "=========================================================="
     echo "Upgrade path from $CURRENT_VERSION to 10.6 is supported."
     echo "=========================================================="
 else
-    handle_error "Upgrade path from $CURRENT_VERSION to 10.6 may not be supported. Please check MariaDB documentation."
+    echo "=========================================================="
+    echo "Upgrade path from $CURRENT_VERSION to 10.6 may not be supported. Please check MariaDB documentation."
+    echo "Exiting..."
+    echo "=========================================================="
+    exit 1
 fi
 
-# Check if any databases exist
+# Check for sufficient disk space
 echo "=========================================================="
-echo "Checking for existing databases..."
+echo "Checking for sufficient disk space..."
 echo "=========================================================="
-DB_COUNT=$(mariadb -N -e 'SHOW DATABASES;' | wc -l)
-if [ "$DB_COUNT" -eq 0 ]; then
-    handle_error "No databases found."
+REQUIRED_SPACE_GB=5  # Estimate required space in GB
+AVAILABLE_SPACE_GB=$(df / | awk 'NR==2 {print $4 / 1024 / 1024}')
+if (( $(echo "$AVAILABLE_SPACE_GB >= $REQUIRED_SPACE_GB" | bc -l) )); then
+    echo "=========================================================="
+    echo "Sufficient disk space available: $AVAILABLE_SPACE_GB GB"
+    echo "=========================================================="
 else
     echo "=========================================================="
-    echo "Found $DB_COUNT databases. Proceeding with upgrade."
+    echo "Insufficient disk space: $AVAILABLE_SPACE_GB GB available, $REQUIRED_SPACE_GB GB required. Exiting..."
     echo "=========================================================="
-fi
-
-# Check for deprecated features
-echo "=========================================================="
-echo "Checking for deprecated features in MariaDB configuration..."
-echo "=========================================================="
-DEPRECATED_FEATURES=$(mariadb --print-defaults | grep -i "deprecated")
-if [ -n "$DEPRECATED_FEATURES" ]; then
-    echo "=========================================================="
-    echo "Deprecated features detected:"
-    echo "$DEPRECATED_FEATURES"
-    handle_error "Please review and remove deprecated features before proceeding."
-else
-    echo "=========================================================="
-    echo "No deprecated features found."
-    echo "=========================================================="
+    exit 1
 fi
 
 # Backup all databases
@@ -145,14 +138,12 @@ echo "=========================================================="
 echo "Backing up all databases to $BACKUP_DIR"
 echo "=========================================================="
 mkdir -p "$BACKUP_DIR"
-mariadb -N -e 'show databases' | while read -r dbname; do
-  echo "Backup in progress $dbname......"
-  if ! mysqldump --complete-insert --routines --triggers --single-transaction "$dbname" > "$BACKUP_DIR/$dbname.sql"; then
-    handle_error "Backup failed for database $dbname."
-  fi
+mysql -N -e 'show databases' | while read dbname; do
+  echo "Backing up $dbname..."
+  mysqldump --complete-insert --routines --triggers --single-transaction "$dbname" > "$BACKUP_DIR/$dbname.sql"
 done
 echo "=========================================================="
-echo "Backup job completed."
+echo "Backup completed."
 echo "=========================================================="
 
 # Retrieve MariaDB root password
@@ -160,8 +151,11 @@ echo "=========================================================="
 echo "Retrieving MariaDB root password..."
 echo "=========================================================="
 MYSQL_ROOT_PASSWORD=$(cat /etc/cyberpanel/mysqlPassword)
-if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
-    handle_error "MariaDB root password not found."
+if [[ -z "$MYSQL_ROOT_PASSWORD" ]]; then
+    echo "=========================================================="
+    echo "MariaDB root password not found. Exiting..."
+    echo "=========================================================="
+    exit 1
 fi
 echo "Password retrieved."
 
@@ -169,12 +163,8 @@ echo "Password retrieved."
 echo "=========================================================="
 echo "Configuring MariaDB for proper shutdown..."
 echo "=========================================================="
-if ! mariadb -u root -p"$MYSQL_ROOT_PASSWORD" -e "SET GLOBAL innodb_fast_shutdown = 1;"; then
-    handle_error "Failed to set innodb_fast_shutdown."
-fi
-if ! mariadb -u root -p"$MYSQL_ROOT_PASSWORD" -e "XA RECOVER;"; then
-    handle_error "Failed to execute XA RECOVER."
-fi
+mariadb -u root -p"$MYSQL_ROOT_PASSWORD" -e "SET GLOBAL innodb_fast_shutdown = 1;"
+mariadb -u root -p"$MYSQL_ROOT_PASSWORD" -e "XA RECOVER;"
 echo "=========================================================="
 echo "MariaDB configured for shutdown."
 echo "=========================================================="
@@ -189,7 +179,10 @@ if systemctl status mariadb | grep "inactive (dead)"; then
   echo "MariaDB server has been stopped successfully."
   echo "=========================================================="
 else
-  handle_error "Failed to stop MariaDB server."
+  echo "=========================================================="
+  echo "Failed to stop MariaDB server. Exiting..."
+  echo "=========================================================="
+  exit 1
 fi
 
 echo "=========================================================="
@@ -198,7 +191,9 @@ echo "=========================================================="
 apt list --installed | grep -i -E "mariadb|galera"
 apt remove "*mariadb*" "galera*" -y
 if apt list --installed | grep -i -E "mariadb|galera"; then
-  handle_error "Some MariaDB packages are still present. Manual intervention required."
+  echo "=========================================================="
+  echo "Some MariaDB packages are still present. Manual intervention required."
+  echo "=========================================================="
 else
   echo "=========================================================="
   echo "Old MariaDB packages removed successfully."
@@ -207,15 +202,11 @@ fi
 
 # Install the new MariaDB version
 echo "=========================================================="
-echo "Installing MariaDB 10.6....."
+echo "Installing MariaDB 10.6..."
 echo "=========================================================="
-if ! curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- --mariadb-server-version="mariadb-10.6"; then
-    handle_error "Failed to setup MariaDB repository."
-fi
+curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | sudo bash -s -- --mariadb-server-version="mariadb-10.6"
 apt update
-if ! apt install mariadb-server libmariadb-dev -y; then
-    handle_error "Failed to install MariaDB 10.6."
-fi
+apt install mariadb-server libmariadb-dev -y
 echo "=========================================================="
 echo "MariaDB 10.6 installed."
 echo "=========================================================="
@@ -231,7 +222,10 @@ if systemctl status mariadb | grep "active (running)"; then
   echo "MariaDB server started successfully."
   echo "=========================================================="
 else
-  handle_error "Failed to start MariaDB server."
+  echo "=========================================================="
+  echo "Failed to start MariaDB server. Exiting..."
+  echo "=========================================================="
+  exit 1
 fi
 
 # Upgrade the database schema
@@ -239,23 +233,33 @@ echo "=========================================================="
 echo "Running mariadb_upgrade..."
 echo "=========================================================="
 start_time=$(date +%s)
-if ! mariadb-upgrade -u root -p"$MYSQL_ROOT_PASSWORD"; then
-    handle_error "Upgrade encountered issues. Please check the logs."
+mariadb-upgrade -u root -p"$MYSQL_ROOT_PASSWORD"
+if [ $? -eq 0 ]; then
+  echo "=========================================================="
+  echo "Upgrade completed successfully."
+  echo "=========================================================="
+else
+  echo "=========================================================="
+  echo "Upgrade encountered issues. Please check the logs."
+  echo "=========================================================="
+  exit 1
 fi
-echo "=========================================================="
-echo "Upgrade completed successfully."
-echo "=========================================================="
 
 # Force the upgrade
 echo "=========================================================="
 echo "Forcing upgrade with mariadb-upgrade --force..."
 echo "=========================================================="
-if ! mariadb-upgrade --force; then
-    handle_error "Forced upgrade encountered issues. Please check the logs."
+mariadb-upgrade --force
+if [ $? -eq 0 ]; then
+  echo "=========================================================="
+  echo "Forced upgrade completed successfully."
+  echo "=========================================================="
+else
+  echo "=========================================================="
+  echo "Forced upgrade encountered issues. Please check the logs."
+  echo "=========================================================="
+  exit 1
 fi
-echo "=========================================================="
-echo "Forced upgrade completed successfully."
-echo "=========================================================="
 
 # Final checks
 echo "=========================================================="

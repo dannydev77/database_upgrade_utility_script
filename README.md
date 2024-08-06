@@ -11,7 +11,8 @@ This script automates the process of upgrading MariaDB from an older version to 
    You can download and run the script using the following command:
 
    ```bash
-   sh <(curl -s https://raw.githubusercontent.com/dannydev77/database_upgrade_utility_script/main/database_upgrade.sh || wget -qO- https://raw.githubusercontent.com/dannydev77/database_upgrade_utility_script/main/database_upgrade.sh)
+   bash <(curl -s https://raw.githubusercontent.com/dannydev77/database_upgrade_utility_script/main/database_upgrade.sh || wget -qO- https://raw.githubusercontent.com/dannydev77/database_upgrade_utility_script/main/database_upgrade.sh)
+
 
 The script will at some point for input. 
 Enter optin 'N' and it will proceed.
